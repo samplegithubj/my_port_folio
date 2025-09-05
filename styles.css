@@ -1361,4 +1361,37 @@ footer a:hover {
   color: var(--text-color, #fff);
   transform: scale(1.05);
 }
+
+/* ===== Mobile & Anchor Safety Fixes (add at end of styles.css) ===== */
+
+/* Make in-page anchor targets land below fixed header */
+section { scroll-margin-top: 90px; }
+
+/* If animations ever misbehave on phones, don't keep content hidden */
+@media (max-width: 768px) {
+  .animate-section,
+  .project-card,
+  .education-card,
+  .cert-card,
+  .contact-message.card,
+  .contact-info.card {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-section,
+  .project-card,
+  .education-card,
+  .cert-card,
+  .contact-message.card,
+  .contact-info.card {
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
     

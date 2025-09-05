@@ -1,6 +1,7 @@
+// scripts.js (replace everything with this)
 document.addEventListener('DOMContentLoaded', () => {
   /* ----------------------------
-   🌙 Theme Toggle Functionality
+   🌙 Theme Toggle
   ---------------------------- */
   const themeSwitch = document.querySelector('#theme-switch');
   if (themeSwitch) {
@@ -15,36 +16,40 @@ document.addEventListener('DOMContentLoaded', () => {
       const newTheme = themeSwitch.checked ? 'dark' : 'light';
       document.body.classList.toggle('dark-theme', newTheme === 'dark');
       localStorage.setItem('theme', newTheme);
-      console.log(`Theme toggled to: ${newTheme}`);
     });
-  } else {
-    console.error('Theme switch input (#theme-switch) not found in the DOM');
   }
 
   /* ----------------------------
-   🧭 Smooth Scrolling for Navigation
+   🧭 Smooth Scroll (with header offset)
   ---------------------------- */
+  const header = document.querySelector('header');
+  const offset = (header?.offsetHeight || 70) + 16; // header + small gap
   const navLinks = document.querySelectorAll('.nav-links a');
+
+  function smoothScrollToTarget(target) {
+    const top = target.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top, behavior: 'smooth' });
+  }
+
   if (navLinks.length > 0) {
     navLinks.forEach(anchor => {
-      anchor.addEventListener('click', function (e) {
+      anchor.addEventListener('click', (e) => {
+        const href = anchor.getAttribute('href');
+        if (!href || !href.startsWith('#')) return; // external links ignored
+
         e.preventDefault();
-        const targetId = this.getAttribute('href');
-        const targetSection = document.querySelector(targetId);
-
-        if (targetSection) {
-          targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
+        const target = document.querySelector(href);
+        if (target) {
+          smoothScrollToTarget(target);
           // highlight active link
-          navLinks.forEach(link => link.classList.remove('active'));
-          this.classList.add('active');
-        } else {
-          console.warn(`Navigation target ${targetId} not found`);
+          navLinks.forEach(l => l.classList.remove('active'));
+          anchor.classList.add('active');
+          // close mobile menu after click
+          document.querySelector('.hamburger')?.classList.remove('active');
+          document.querySelector('.nav-links')?.classList.remove('active');
         }
       });
     });
-  } else {
-    console.warn('No navigation links (.nav-links a) found');
   }
 
   /* ----------------------------
@@ -56,40 +61,33 @@ document.addEventListener('DOMContentLoaded', () => {
     hamburger.addEventListener('click', () => {
       hamburger.classList.toggle('active');
       navLinksContainer.classList.toggle('active');
-      console.log('Hamburger menu toggled');
     });
 
+    // close menu when any nav link is tapped
     navLinks.forEach(link => {
       link.addEventListener('click', () => {
         hamburger.classList.remove('active');
         navLinksContainer.classList.remove('active');
       });
     });
-  } else {
-    console.warn('Hamburger menu (.hamburger) or nav links (.nav-links) not found');
   }
 
   /* ----------------------------
-   📬 Contact Form (Validation + Send to Formspree)
+   📬 Contact Form (validation + Formspree-friendly)
   ---------------------------- */
   const contactForm = document.getElementById('contact-form');
   if (contactForm) {
-    contactForm.addEventListener('submit', async function (e) {
+    contactForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-
       const name = document.getElementById('name')?.value.trim();
       const email = document.getElementById('email')?.value.trim();
       const subject = document.getElementById('subject')?.value.trim();
       const message = document.getElementById('message')?.value.trim();
       const formMessage = document.getElementById('form-message');
 
-      if (!formMessage) {
-        console.error('Form message element (#form-message) not found');
-        return;
-      }
+      if (!formMessage) return;
 
-      formMessage.style.color = '#e63946'; // red by default
-
+      formMessage.style.color = '#e63946';
       if (!name || name.length < 2) {
         formMessage.innerText = '⚠️ Please enter a valid name (2+ characters).';
         return;
@@ -103,75 +101,94 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // prepare data for Formspree
-      const data = {
-        name,
-        email,
-        subject,
-        message
-      };
-
       try {
-        const response = await fetch('https://formspree.io/f/mpwjlydl', {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(data)
-        });
+        // If your form has action="https://formspree.io/f/XXXX" set, we’ll respect it.
+        const actionUrl = contactForm.getAttribute('action');
+        if (actionUrl) {
+          const fd = new FormData();
+          fd.append('name', name);
+          fd.append('email', email);
+          if (subject) fd.append('subject', subject);
+          fd.append('message', message);
 
-        if (response.ok) {
-          formMessage.style.color = '#2a9d8f'; // green
-          formMessage.innerText = '✅ Thanks! Your message has been sent successfully.';
-          contactForm.reset();
-          console.log('Form submitted successfully to Formspree');
+          const res = await fetch(actionUrl, {
+            method: 'POST',
+            body: fd,
+            headers: { 'Accept': 'application/json' }
+          });
+
+          if (res.ok) {
+            formMessage.style.color = '#2a9d8f';
+            formMessage.innerText = '✅ Thanks! Your message has been sent.';
+            contactForm.reset();
+          } else {
+            formMessage.innerText = '⚠️ Could not send message. Please try again later.';
+          }
         } else {
-          formMessage.innerText = '❌ Oops! Something went wrong. Please try again later.';
-          console.error('Form submission failed:', response.statusText);
+          // No action set: just validate and show success
+          formMessage.style.color = '#2a9d8f';
+          formMessage.innerText = '✅ Thanks! Your message is ready to be sent.';
+          contactForm.reset();
         }
-      } catch (error) {
-        formMessage.innerText = '❌ Network error. Please check your connection.';
-        console.error('Error submitting form:', error);
+      } catch (err) {
+        formMessage.innerText = '⚠️ Network error. Please try again.';
       }
     });
-  } else {
-    console.warn('Contact form (#contact-form) not found');
   }
 
   /* ----------------------------
-   🎬 Scroll Animations
+   🎬 Scroll Animations (with mobile & safety fallbacks)
   ---------------------------- */
-  const observerOptions = { root: null, threshold: 0.1 };
-
-  const scrollObserver = new IntersectionObserver((entries, observer) => {
-    entries.forEach((entry, index) => {
-      if (entry.isIntersecting) {
-        if (
-          entry.target.classList.contains('project-card') ||
-          entry.target.classList.contains('education-card') ||
-          entry.target.classList.contains('cert-card') ||
-          entry.target.classList.contains('contact-message') ||
-          entry.target.classList.contains('contact-info')
-        ) {
-          setTimeout(() => {
-            entry.target.classList.add('visible');
-          }, index * 200); // stagger
-        } else {
-          entry.target.classList.add('visible');
-        }
-        observer.unobserve(entry.target);
-      }
-    });
-  }, observerOptions);
-
   const elementsToAnimate = document.querySelectorAll(
     '.animate-section, .project-card, .education-card, .cert-card, .contact-message.card, .contact-info.card'
   );
 
-  if (elementsToAnimate.length > 0) {
-    elementsToAnimate.forEach(element => scrollObserver.observe(element));
+  const reveal = (el) => el.classList.add('visible');
+
+  const smallScreen = window.matchMedia('(max-width: 768px)').matches;
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // On phones or reduced motion, show everything immediately
+  if (smallScreen || prefersReducedMotion || elementsToAnimate.length === 0) {
+    elementsToAnimate.forEach(reveal);
+    return;
+  }
+
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries, observer) => {
+      entries.forEach((entry, index) => {
+        if (entry.isIntersecting) {
+          const t = entry.target;
+          // Stagger only for card-like elements
+          if (
+            t.classList.contains('project-card') ||
+            t.classList.contains('education-card') ||
+            t.classList.contains('cert-card') ||
+            t.classList.contains('contact-message') ||
+            t.classList.contains('contact-info')
+          ) {
+            setTimeout(() => reveal(t), index * 120);
+          } else {
+            reveal(t);
+          }
+          observer.unobserve(t);
+        }
+      });
+    }, { root: null, threshold: 0.1, rootMargin: '0px 0px -10% 0px' });
+
+    elementsToAnimate.forEach(el => io.observe(el));
+
+    // Safety reveal: if anything stayed hidden after 1.2s (iOS/Safari quirks)
+    setTimeout(() => {
+      document
+        .querySelectorAll('.animate-section:not(.visible) .project-card, .animate-section:not(.visible) > *')
+        .forEach(reveal);
+      document
+        .querySelectorAll('.project-card:not(.visible), .education-card:not(.visible), .cert-card:not(.visible), .contact-message.card:not(.visible), .contact-info.card:not(.visible)')
+        .forEach(reveal);
+    }, 1200);
   } else {
-    console.warn('No elements found for scroll animations');
+    // Old browsers: show all
+    elementsToAnimate.forEach(reveal);
   }
 });
